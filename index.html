@@ -3,147 +3,96 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AR WORLD TOURNAMENT</title>
+<title>Phone Login</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
 body{margin:0;font-family:Arial;background:#070b1a;color:white}
-header{padding:15px;text-align:center;background:#111a33;font-weight:bold}
 .card{background:#1a1f35;margin:10px;padding:10px;border-radius:10px}
-input,button{width:100%;padding:10px;margin-top:5px;border-radius:8px;border:none}
-button{font-weight:bold}
-.hidden{display:none}
-.google{
-background:#4285F4;color:white;
-}
+input,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:none}
+button{background:#ffcc00;font-weight:bold}
 </style>
 </head>
 
 <body>
 
-<header>🌍 AR WORLD TOURNAMENT</header>
-
-<!-- LOGIN -->
-<div id="auth" class="card">
-
-<h3>Login</h3>
-
-<input id="email" placeholder="Email">
-<input id="pass" type="password" placeholder="Password">
-
-<button onclick="signup()">Signup</button>
-<button onclick="login()">Login</button>
-
-<hr>
-
-<!-- GOOGLE LOGIN -->
-<button class="google" onclick="googleLogin()">
-🔵 Continue with Google
-</button>
-
-</div>
-
-<!-- USER PANEL -->
-<div id="user" class="hidden">
-
 <div class="card">
-<h3>👤 Welcome</h3>
-<p id="name"></p>
+<h3>📱 Phone Number Login</h3>
+
+<input id="phone" placeholder="+92XXXXXXXXXX">
+<div id="recaptcha-container"></div>
+
+<button onclick="sendOTP()">Send OTP</button>
+
+<input id="otp" placeholder="Enter OTP">
+<button onclick="verifyOTP()">Verify</button>
+
 </div>
 
-<div class="card">
-<h3>💰 Balance: <span id="bal">0</span></h3>
-</div>
-
-<div class="card">
-<h3>🏆 Tournaments</h3>
-<div id="tournaments"></div>
-</div>
-
+<div class="card" id="userBox" style="display:none">
+<h3>✅ Login Successful</h3>
+<p id="userPhone"></p>
 </div>
 
 <script>
 
 /* 🔥 FIREBASE CONFIG */
 const firebaseConfig = {
-apiKey:"YOUR_API_KEY",
-authDomain:"YOUR_DOMAIN",
-projectId:"YOUR_PROJECT"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_PROJECT"
 };
 
 firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
-const db = firebase.firestore();
 
-/* GOOGLE PROVIDER */
-const provider = new firebase.auth.GoogleAuthProvider();
+let confirmationResult;
 
-/* EMAIL SIGNUP */
-function signup(){
-auth.createUserWithEmailAndPassword(email.value,pass.value);
+/* 🔐 Recaptcha */
+window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier(
+'recaptcha-container',
+{
+  size: 'normal'
 }
+);
 
-/* EMAIL LOGIN */
-function login(){
-auth.signInWithEmailAndPassword(email.value,pass.value);
-}
+/* 📱 SEND OTP */
+function sendOTP(){
 
-/* 🔵 GOOGLE LOGIN */
-function googleLogin(){
-auth.signInWithPopup(provider)
-.then(res=>{
-console.log(res.user);
+let phone = document.getElementById("phone").value;
+
+auth.signInWithPhoneNumber(phone, window.recaptchaVerifier)
+.then(result=>{
+confirmationResult = result;
+alert("OTP Sent");
 })
 .catch(err=>{
 alert(err.message);
 });
+
 }
 
-/* AUTH STATE */
-auth.onAuthStateChanged(user=>{
-if(user){
-auth.style.display="none";
-document.getElementById("user").classList.remove("hidden");
+/* 🔑 VERIFY OTP */
+function verifyOTP(){
 
-/* NAME */
-document.getElementById("name").innerText =
-user.displayName || user.email;
+let code = document.getElementById("otp").value;
 
-/* CREATE USER DOC */
-db.collection("users").doc(user.uid).set({
-email:user.email,
-balance:0
-},{merge:true});
+confirmationResult.confirm(code)
+.then(result=>{
+let user = result.user;
 
-loadBalance();
-loadTournaments();
-}
+document.getElementById("userBox").style.display="block";
+document.getElementById("userPhone").innerText = user.phoneNumber;
+
+alert("Login Successful");
+})
+.catch(err=>{
+alert("Wrong OTP");
 });
 
-/* 💰 BALANCE */
-function loadBalance(){
-db.collection("users").doc(auth.currentUser.uid)
-.onSnapshot(doc=>{
-bal.innerText = doc.data()?.balance || 0;
-});
-}
-
-/* 🏆 TOURNAMENTS */
-function loadTournaments(){
-db.collection("tournaments").onSnapshot(s=>{
-tournaments.innerHTML="";
-s.forEach(d=>{
-tournaments.innerHTML+=`
-<div class="card">
-🏆 ${d.data().title || "Tournament"}<br>
-💰 Fee: ${d.data().fee || 0}
-</div>`;
-});
-});
 }
 
 </script>
