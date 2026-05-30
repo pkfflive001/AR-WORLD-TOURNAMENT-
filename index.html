@@ -3,37 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Phone Login</title>
+<title>AR WORLD TOURNAMENT - USER</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
 body{margin:0;font-family:Arial;background:#070b1a;color:white}
+header{padding:15px;text-align:center;background:#111a33;font-weight:bold}
 .card{background:#1a1f35;margin:10px;padding:10px;border-radius:10px}
-input,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:none}
-button{background:#ffcc00;font-weight:bold}
+button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:none;background:#ffcc00;font-weight:bold}
+.hidden{display:none}
+.slot{color:#00ffcc}
 </style>
 </head>
 
 <body>
 
-<div class="card">
-<h3>📱 Phone Number Login</h3>
+<header>🌍 AR WORLD TOURNAMENT</header>
 
-<input id="phone" placeholder="+92XXXXXXXXXX">
-<div id="recaptcha-container"></div>
-
-<button onclick="sendOTP()">Send OTP</button>
-
-<input id="otp" placeholder="Enter OTP">
-<button onclick="verifyOTP()">Verify</button>
-
+<!-- LOGIN -->
+<div class="card" id="loginBox">
+<h3>👤 Guest Login</h3>
+<p>Continue without email or phone</p>
+<button onclick="anonLogin()">🚀 Continue as Guest</button>
 </div>
 
-<div class="card" id="userBox" style="display:none">
-<h3>✅ Login Successful</h3>
-<p id="userPhone"></p>
+<!-- USER PANEL -->
+<div id="userPanel" class="hidden">
+
+<div class="card">
+<h3>👤 User ID</h3>
+<p id="uid"></p>
+</div>
+
+<div class="card">
+<h3>💰 Balance: <span id="bal">0</span></h3>
+</div>
+
+<div class="card">
+<h3>🏆 Tournaments</h3>
+<div id="tournaments"></div>
+</div>
+
 </div>
 
 <script>
@@ -48,51 +61,96 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
+const db = firebase.firestore();
 
-let confirmationResult;
+let user=null;
 
-/* 🔐 Recaptcha */
-window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier(
-'recaptcha-container',
-{
-  size: 'normal'
-}
-);
+/* 👤 ANONYMOUS LOGIN */
+function anonLogin(){
+auth.signInAnonymously()
+.then(res=>{
+user=res.user;
 
-/* 📱 SEND OTP */
-function sendOTP(){
+document.getElementById("loginBox").style.display="none";
+document.getElementById("userPanel").classList.remove("hidden");
 
-let phone = document.getElementById("phone").value;
+document.getElementById("uid").innerText=user.uid;
 
-auth.signInWithPhoneNumber(phone, window.recaptchaVerifier)
-.then(result=>{
-confirmationResult = result;
-alert("OTP Sent");
+createUserDoc();
+loadBalance();
+loadTournaments();
 })
 .catch(err=>{
 alert(err.message);
 });
-
 }
 
-/* 🔑 VERIFY OTP */
-function verifyOTP(){
+/* 💾 CREATE USER DOC */
+function createUserDoc(){
+db.collection("users").doc(user.uid).set({
+balance:0,
+createdAt:Date.now()
+},{merge:true});
+}
 
-let code = document.getElementById("otp").value;
+/* 💰 BALANCE */
+function loadBalance(){
+db.collection("users").doc(user.uid)
+.onSnapshot(doc=>{
+bal.innerText = doc.data()?.balance || 0;
+});
+}
 
-confirmationResult.confirm(code)
-.then(result=>{
-let user = result.user;
+/* 🏆 TOURNAMENTS */
+function loadTournaments(){
+db.collection("tournaments").onSnapshot(s=>{
+tournaments.innerHTML="";
 
-document.getElementById("userBox").style.display="block";
-document.getElementById("userPhone").innerText = user.phoneNumber;
+s.forEach(d=>{
+let t=d.data();
 
-alert("Login Successful");
-})
-.catch(err=>{
-alert("Wrong OTP");
+tournaments.innerHTML+=`
+<div class="card">
+<h3>🏆 ${t.title || "Tournament"}</h3>
+<p>💰 Fee: ${t.fee || 0}</p>
+<p class="slot">👥 Slots: ${t.joined || 0}/${t.slots || 0}</p>
+
+<button onclick="join('${d.id}',${t.fee || 0},${t.slots || 0},${t.joined || 0})">
+Join Tournament
+</button>
+</div>`;
+});
+});
+}
+
+/* 🎮 JOIN SYSTEM */
+function join(id,fee,slots,joined){
+
+db.collection("users").doc(user.uid).get().then(doc=>{
+let bal=doc.data()?.balance || 0;
+
+if(bal>=fee && joined<slots){
+
+db.collection("users").doc(user.uid).update({
+balance:bal-fee
 });
 
+db.collection("tournaments").doc(id).update({
+joined:joined+1
+});
+
+db.collection("joins").add({
+uid:user.uid,
+tid:id,
+time:Date.now()
+});
+
+alert("🎉 Joined Successfully!");
+}
+else{
+alert("❌ Not enough balance or slots full");
+}
+});
 }
 
 </script>
