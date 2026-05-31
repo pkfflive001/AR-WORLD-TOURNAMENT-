@@ -14,6 +14,7 @@ body{margin:0;font-family:Arial;background:#070b1a;color:white}
 header{padding:15px;text-align:center;background:#111a33;font-weight:bold}
 .card{background:#1a1f35;margin:10px;padding:10px;border-radius:10px}
 button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:none;background:#ffcc00;font-weight:bold}
+.google{background:#4285F4;color:white}
 .hidden{display:none}
 .slot{color:#00ffcc}
 </style>
@@ -25,9 +26,11 @@ button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:none;back
 
 <!-- LOGIN -->
 <div class="card" id="loginBox">
-<h3>👤 Guest Login</h3>
-<p>Continue without email or phone</p>
+<h3>👤 Login Options</h3>
+<p>Select method</p>
+
 <button onclick="anonLogin()">🚀 Continue as Guest</button>
+<button class="google" onclick="googleLogin()">🔵 Continue with Google</button>
 </div>
 
 <!-- USER PANEL -->
@@ -65,27 +68,43 @@ const db = firebase.firestore();
 
 let user=null;
 
-/* 👤 ANONYMOUS LOGIN */
+/* 🚀 GUEST LOGIN */
 function anonLogin(){
 auth.signInAnonymously()
 .then(res=>{
 user=res.user;
+afterLogin("Guest");
+})
+.catch(err=>alert(err.message));
+}
+
+/* 🔵 GOOGLE LOGIN */
+function googleLogin(){
+const provider = new firebase.auth.GoogleAuthProvider();
+
+auth.signInWithPopup(provider)
+.then(res=>{
+user=res.user;
+afterLogin(res.user.displayName);
+})
+.catch(err=>alert(err.message));
+}
+
+/* ✅ COMMON AFTER LOGIN */
+function afterLogin(name){
 
 document.getElementById("loginBox").style.display="none";
 document.getElementById("userPanel").classList.remove("hidden");
 
-document.getElementById("uid").innerText=user.uid;
+document.getElementById("uid").innerText =
+user.uid + " (" + name + ")";
 
 createUserDoc();
 loadBalance();
 loadTournaments();
-})
-.catch(err=>{
-alert(err.message);
-});
 }
 
-/* 💾 CREATE USER DOC */
+/* 💾 USER DOC */
 function createUserDoc(){
 db.collection("users").doc(user.uid).set({
 balance:0,
@@ -97,7 +116,8 @@ createdAt:Date.now()
 function loadBalance(){
 db.collection("users").doc(user.uid)
 .onSnapshot(doc=>{
-bal.innerText = doc.data()?.balance || 0;
+document.getElementById("bal").innerText =
+doc.data()?.balance || 0;
 });
 }
 
@@ -123,7 +143,7 @@ Join Tournament
 });
 }
 
-/* 🎮 JOIN SYSTEM */
+/* 🎮 JOIN */
 function join(id,fee,slots,joined){
 
 db.collection("users").doc(user.uid).get().then(doc=>{
